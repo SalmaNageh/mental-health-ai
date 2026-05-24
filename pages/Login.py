@@ -1,5 +1,5 @@
 import streamlit as st
-from db import init_db, add_user, check_user
+from db import init_db, add_user, check_user ,create_admin()
 
 # =========================
 # PAGE CONFIG
@@ -10,7 +10,7 @@ st.set_page_config(page_title="Login", page_icon="🔐")
 # INIT DB (once)
 # =========================
 init_db()
-
+create_admin()
 # =========================
 # SESSION STATE SAFETY
 # =========================
