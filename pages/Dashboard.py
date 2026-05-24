@@ -5,10 +5,15 @@ import numpy as np
 import time
 import requests
 from streamlit_lottie import st_lottie
+
 from db import init_db, add_history
-init_db()
 
 from auth import check_login
+
+# =========================
+# INIT DB (safe)
+# =========================
+init_db()
 
 # =========================
 # AUTH
@@ -25,83 +30,15 @@ st.set_page_config(
 )
 
 # =========================
-# THEME TOGGLE
+# LOAD MODEL (CACHE FIX)
 # =========================
-if "theme" not in st.session_state:
-    st.session_state.theme = "dark"
+@st.cache_resource
+def load_models():
+    model = joblib.load("model.pkl")
+    vectorizer = joblib.load("vectorizer.pkl")
+    return model, vectorizer
 
-if st.sidebar.button("🌓 Toggle Theme"):
-    st.session_state.theme = "light" if st.session_state.theme == "dark" else "dark"
-
-# =========================
-# COLORS
-# =========================
-if st.session_state.theme == "dark":
-    bg = "#0b1220"
-    card = "#1e293b"
-    text = "white"
-else:
-    bg = "#f1f5f9"
-    card = "white"
-    text = "black"
-
-# =========================
-# CSS (GLASS + UI)
-# =========================
-st.markdown(f"""
-<style>
-
-.stApp {{
-    background-color: {bg};
-    color: {text};
-}}
-
-.title {{
-    font-size: 42px;
-    font-weight: 800;
-    text-align: center;
-    background: linear-gradient(90deg, #60a5fa, #a78bfa);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-}}
-
-.subtitle {{
-    text-align: center;
-    color: gray;
-    margin-bottom: 20px;
-}}
-
-.card {{
-    background: rgba(255,255,255,0.05);
-    backdrop-filter: blur(12px);
-    border-radius: 20px;
-    padding: 20px;
-    border: 1px solid rgba(255,255,255,0.1);
-    box-shadow: 0 8px 32px rgba(0,0,0,0.3);
-    transition: 0.3s;
-}}
-
-.card:hover {{
-    transform: scale(1.03);
-}}
-
-.stButton>button {{
-    width: 100%;
-    border-radius: 12px;
-    height: 50px;
-    font-weight: bold;
-    background: linear-gradient(90deg, #2563eb, #1d4ed8);
-    color: white;
-}}
-
-</style>
-""", unsafe_allow_html=True)
-
-# =========================
-# LOAD MODEL
-# =========================
-model = joblib.load("model.pkl")
-vectorizer = joblib.load("vectorizer.pkl")
+model, vectorizer = load_models()
 
 # =========================
 # SESSION STATE
@@ -109,16 +46,20 @@ vectorizer = joblib.load("vectorizer.pkl")
 if "history" not in st.session_state:
     st.session_state.history = []
 
+if "user" not in st.session_state:
+    st.session_state.user = "User"
+
 # =========================
 # SIDEBAR
 # =========================
-st.sidebar.success("👋 Welcome back!")
+st.sidebar.success(f"👋 Welcome {st.session_state.user}")
 
 # =========================
 # TITLE
 # =========================
-st.markdown("<div class='title'>🧠 MindCare AI</div>", unsafe_allow_html=True)
-st.markdown("<div class='subtitle'>AI Mental Health Analysis Dashboard</div>", unsafe_allow_html=True)
+st.markdown("<div style='font-size:40px;text-align:center;font-weight:bold'>🧠 MindCare AI</div>", unsafe_allow_html=True)
+
+st.markdown("<div style='text-align:center;color:gray'>AI Mental Health Analysis Dashboard</div>", unsafe_allow_html=True)
 
 # =========================
 # METRICS
@@ -128,12 +69,6 @@ col1, col2, col3 = st.columns(3)
 col1.metric("🧠 Total Predictions", len(st.session_state.history))
 col2.metric("📊 System", "AI Active")
 col3.metric("⚡ Status", "Running")
-
-# =========================
-# LOTTIE
-# =========================
-def load_lottie(url):
-    return requests.get(url).json()
 
 # =========================
 # INPUT
@@ -148,6 +83,12 @@ def clean_text(text):
     return text
 
 # =========================
+# LOTTIE
+# =========================
+def load_lottie(url):
+    return requests.get(url).json()
+
+# =========================
 # ANALYZE
 # =========================
 if st.button("Analyze"):
@@ -156,7 +97,7 @@ if st.button("Analyze"):
         st.warning("Please enter text")
 
     else:
-        with st.spinner("🧠 AI is analyzing..."):
+        with st.spinner("🧠 AI analyzing..."):
             time.sleep(2)
 
         cleaned = clean_text(text)
@@ -164,10 +105,18 @@ if st.button("Analyze"):
         vector = vectorizer.transform([cleaned])
         prediction = model.predict(vector)[0]
 
-        st.session_state.history.append(prediction)
-
         score = np.max(model.decision_function(vector))
         confidence = min(abs(score) / 3, 1)
+
+        # ================= SAVE TO DB =================
+        add_history(
+            st.session_state.user,
+            cleaned,
+            prediction,
+            float(confidence)
+        )
+
+        st.session_state.history.append(prediction)
 
         # ================= LOTTIE =================
         if prediction == "Depression":
@@ -179,33 +128,33 @@ if st.button("Analyze"):
 
         st_lottie(load_lottie(url), height=180)
 
-        # ================= RESULT CARD =================
+        # ================= RESULT =================
         st.markdown(f"""
-        <div class="card" style="margin-top:20px;">
-            <h2>Prediction: {prediction}</h2>
-            <p>Confidence: {confidence*100:.1f}%</p>
+        <div style="
+            padding:20px;
+            border-radius:20px;
+            background:linear-gradient(135deg,#2563eb,#0f172a);
+            color:white;
+            text-align:center;
+            font-size:22px;
+        ">
+        Prediction: {prediction} <br>
+        Confidence: {confidence*100:.1f}%
         </div>
         """, unsafe_allow_html=True)
 
         st.progress(confidence)
 
-        # ================= SUPPORT =================
         messages = {
-            "Anxiety": "Try to slow down and breathe.",
+            "Anxiety": "Try to breathe slowly.",
             "Depression": "Talk to someone you trust.",
-            "Stress": "Take breaks and rest.",
+            "Stress": "Take breaks.",
             "Normal": "You are doing great ✨",
             "Suicidal": "Please seek help immediately."
         }
 
         st.info(messages.get(prediction, "Take care 💙"))
-        
-add_history(
-    st.session_state.user,
-    cleaned,
-    prediction,
-    float(confidence)
-)
+
 # =========================
 # HISTORY
 # =========================
@@ -214,8 +163,14 @@ st.markdown("### 🕘 Recent Predictions")
 if st.session_state.history:
     for h in st.session_state.history[-5:][::-1]:
         st.markdown(f"""
-        <div class="card">
-            {h}
+        <div style="
+            padding:10px;
+            margin:5px;
+            border-radius:10px;
+            background:#1e293b;
+            color:white;
+        ">
+        {h}
         </div>
         """, unsafe_allow_html=True)
 else:
