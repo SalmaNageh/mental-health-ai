@@ -3,8 +3,10 @@ import joblib
 import re
 import numpy as np
 import time
-from streamlit_lottie import st_lottie
 import requests
+from streamlit_lottie import st_lottie
+from db import init_db, add_history
+init_db()
 
 from auth import check_login
 
@@ -17,10 +19,83 @@ check_login()
 # PAGE CONFIG
 # =========================
 st.set_page_config(
-    page_title="Dashboard",
+    page_title="MindCare AI",
     page_icon="🧠",
-    layout="centered"
+    layout="wide"
 )
+
+# =========================
+# THEME TOGGLE
+# =========================
+if "theme" not in st.session_state:
+    st.session_state.theme = "dark"
+
+if st.sidebar.button("🌓 Toggle Theme"):
+    st.session_state.theme = "light" if st.session_state.theme == "dark" else "dark"
+
+# =========================
+# COLORS
+# =========================
+if st.session_state.theme == "dark":
+    bg = "#0b1220"
+    card = "#1e293b"
+    text = "white"
+else:
+    bg = "#f1f5f9"
+    card = "white"
+    text = "black"
+
+# =========================
+# CSS (GLASS + UI)
+# =========================
+st.markdown(f"""
+<style>
+
+.stApp {{
+    background-color: {bg};
+    color: {text};
+}}
+
+.title {{
+    font-size: 42px;
+    font-weight: 800;
+    text-align: center;
+    background: linear-gradient(90deg, #60a5fa, #a78bfa);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}}
+
+.subtitle {{
+    text-align: center;
+    color: gray;
+    margin-bottom: 20px;
+}}
+
+.card {{
+    background: rgba(255,255,255,0.05);
+    backdrop-filter: blur(12px);
+    border-radius: 20px;
+    padding: 20px;
+    border: 1px solid rgba(255,255,255,0.1);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+    transition: 0.3s;
+}}
+
+.card:hover {{
+    transform: scale(1.03);
+}}
+
+.stButton>button {{
+    width: 100%;
+    border-radius: 12px;
+    height: 50px;
+    font-weight: bold;
+    background: linear-gradient(90deg, #2563eb, #1d4ed8);
+    color: white;
+}}
+
+</style>
+""", unsafe_allow_html=True)
 
 # =========================
 # LOAD MODEL
@@ -34,74 +109,37 @@ vectorizer = joblib.load("vectorizer.pkl")
 if "history" not in st.session_state:
     st.session_state.history = []
 
-if "user" not in st.session_state:
-    st.session_state.user = "User"
-
 # =========================
 # SIDEBAR
 # =========================
-st.sidebar.success(f"👋 Welcome {st.session_state.user}")
+st.sidebar.success("👋 Welcome back!")
 
-if st.sidebar.button("Logout"):
-    st.session_state.logged_in = False
-    st.session_state.user = None
-    st.switch_page("pages/Login.py")
+# =========================
+# TITLE
+# =========================
+st.markdown("<div class='title'>🧠 MindCare AI</div>", unsafe_allow_html=True)
+st.markdown("<div class='subtitle'>AI Mental Health Analysis Dashboard</div>", unsafe_allow_html=True)
+
+# =========================
+# METRICS
+# =========================
+col1, col2, col3 = st.columns(3)
+
+col1.metric("🧠 Total Predictions", len(st.session_state.history))
+col2.metric("📊 System", "AI Active")
+col3.metric("⚡ Status", "Running")
 
 # =========================
 # LOTTIE
 # =========================
 def load_lottie(url):
-    r = requests.get(url)
-    return r.json()
-
-lottie_ai = load_lottie(
-    "https://assets9.lottiefiles.com/packages/lf20_t9gkkhz4.json"
-)
-
-st_lottie(lottie_ai, height=200)
-
-# =========================
-# STYLE
-# =========================
-st.markdown("""
-<style>
-.stApp {
-    background-color: #0b1220;
-    color: white;
-}
-
-.stTextArea textarea {
-    background-color: #111827 !important;
-    color: white !important;
-    border-radius: 12px;
-}
-
-.stButton>button {
-    width: 100%;
-    border-radius: 12px;
-    height: 50px;
-    font-size: 18px;
-    font-weight: bold;
-    background: linear-gradient(90deg, #2563eb, #1d4ed8);
-    color: white;
-}
-</style>
-""", unsafe_allow_html=True)
-
-# =========================
-# TITLE
-# =========================
-st.title("🧠 Mental Health Dashboard")
-st.markdown("Analyze emotions using NLP & Machine Learning")
+    return requests.get(url).json()
 
 # =========================
 # INPUT
 # =========================
-text = st.text_area("Write how you feel:", height=180)
+text = st.text_area("💬 Write how you feel:", height=150)
 
-# =========================
-# CLEAN TEXT
-# =========================
 def clean_text(text):
     text = text.lower()
     text = re.sub(r"http\S+", "", text)
@@ -118,8 +156,7 @@ if st.button("Analyze"):
         st.warning("Please enter text")
 
     else:
-
-        with st.spinner("Analyzing mental state..."):
+        with st.spinner("🧠 AI is analyzing..."):
             time.sleep(2)
 
         cleaned = clean_text(text)
@@ -127,89 +164,59 @@ if st.button("Analyze"):
         vector = vectorizer.transform([cleaned])
         prediction = model.predict(vector)[0]
 
-        # =========================
-        # SAVE STATE
-        # =========================
         st.session_state.history.append(prediction)
-        st.session_state.last_vector = vector
-        st.session_state.last_text = cleaned
 
-        # =========================
-        # CONFIDENCE
-        # =========================
         score = np.max(model.decision_function(vector))
         confidence = min(abs(score) / 3, 1)
 
-        # COLORS
-        if prediction == "Normal":
-            color = "#22c55e"
-        elif prediction in ["Depression", "Suicidal"]:
-            color = "#ef4444"
+        # ================= LOTTIE =================
+        if prediction == "Depression":
+            url = "https://assets2.lottiefiles.com/packages/lf20_depression.json"
+        elif prediction == "Anxiety":
+            url = "https://assets2.lottiefiles.com/packages/lf20_anxiety.json"
         else:
-            color = "#f59e0b"
+            url = "https://assets9.lottiefiles.com/packages/lf20_t9gkkhz4.json"
 
-        # =========================
-        # RESULT CARD
-        # =========================
+        st_lottie(load_lottie(url), height=180)
+
+        # ================= RESULT CARD =================
         st.markdown(f"""
-        <div style="
-            padding:25px;
-            border-radius:20px;
-            background: linear-gradient(135deg, {color}, #0f172a);
-            color:white;
-            font-size:24px;
-            text-align:center;
-            font-weight:bold;
-            margin-top:20px;
-        ">
-        Prediction: {prediction}
+        <div class="card" style="margin-top:20px;">
+            <h2>Prediction: {prediction}</h2>
+            <p>Confidence: {confidence*100:.1f}%</p>
         </div>
         """, unsafe_allow_html=True)
 
-        # =========================
-        # CONFIDENCE
-        # =========================
-        st.markdown("### Confidence Meter")
         st.progress(confidence)
-        st.write(f"{confidence*100:.1f}% confidence")
 
-        # =========================
-        # SUPPORT MESSAGE
-        # =========================
+        # ================= SUPPORT =================
         messages = {
-            "Anxiety": "Try to slow down and focus on one task at a time.",
+            "Anxiety": "Try to slow down and breathe.",
             "Depression": "Talk to someone you trust.",
             "Stress": "Take breaks and rest.",
-            "Normal": "You seem emotionally balanced ✨",
-            "Suicidal": "Please seek professional support.",
-            "Bipolar": "Maintain routine and stability.",
-            "Personality disorder": "Self-awareness helps a lot."
+            "Normal": "You are doing great ✨",
+            "Suicidal": "Please seek help immediately."
         }
 
-        st.info(messages.get(prediction, "Take care of yourself 💙"))
-
+        st.info(messages.get(prediction, "Take care 💙"))
+        
+add_history(
+    st.session_state.user,
+    cleaned,
+    prediction,
+    float(confidence)
+)
 # =========================
-# EXPLAINABLE AI (FIXED)
+# HISTORY
 # =========================
-if "last_vector" in st.session_state:
+st.markdown("### 🕘 Recent Predictions")
 
-    st.markdown("### 🧠 Why this prediction?")
-
-    vector = st.session_state.last_vector
-
-    feature_names = vectorizer.get_feature_names_out()
-
-    vector_array = vector.toarray()[0]
-
-    top_indices = vector_array.argsort()[::-1][:5]
-
-    top_words = [
-        feature_names[i]
-        for i in top_indices
-        if vector_array[i] > 0
-    ]
-
-    if top_words:
-        st.success("Key words: " + ", ".join(top_words))
-    else:
-        st.info("No strong keywords detected")
+if st.session_state.history:
+    for h in st.session_state.history[-5:][::-1]:
+        st.markdown(f"""
+        <div class="card">
+            {h}
+        </div>
+        """, unsafe_allow_html=True)
+else:
+    st.write("No predictions yet")
