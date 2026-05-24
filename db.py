@@ -10,18 +10,19 @@ def get_connection():
     return conn
 
 # =========================
-# INIT DB
+# INIT DB (UPGRADED)
 # =========================
 def init_db():
     conn = get_connection()
     c = conn.cursor()
 
-    # USERS TABLE
+    # USERS TABLE (ADD ROLE)
     c.execute("""
     CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         username TEXT UNIQUE,
-        password TEXT
+        password TEXT,
+        role TEXT DEFAULT 'user'
     )
     """)
 
@@ -47,35 +48,53 @@ def hash_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
 
 # =========================
+# CREATE DEFAULT ADMIN (IMPORTANT)
+# =========================
+def create_admin():
+    conn = get_connection()
+    c = conn.cursor()
+
+    c.execute("""
+    INSERT OR IGNORE INTO users (username, password, role)
+    VALUES (?, ?, ?)
+    """, ("admin", hash_password("admin123"), "admin"))
+
+    conn.commit()
+    conn.close()
+
+# =========================
 # ADD USER
 # =========================
-def add_user(username, password):
+def add_user(username, password, role="user"):
     conn = get_connection()
     c = conn.cursor()
 
     try:
-        c.execute(
-            "INSERT INTO users (username, password) VALUES (?, ?)",
-            (username, hash_password(password))
-        )
+        c.execute("""
+            INSERT INTO users (username, password, role)
+            VALUES (?, ?, ?)
+        """, (username, hash_password(password), role))
+
         conn.commit()
         return True
+
     except:
         return False
 
 # =========================
-# CHECK LOGIN
+# CHECK USER (RETURN ROLE)
 # =========================
 def check_user(username, password):
     conn = get_connection()
     c = conn.cursor()
 
-    c.execute(
-        "SELECT * FROM users WHERE username=? AND password=?",
-        (username, hash_password(password))
-    )
+    c.execute("""
+        SELECT username, role
+        FROM users
+        WHERE username=? AND password=?
+    """, (username, hash_password(password)))
 
-    return c.fetchone() is not None
+    return c.fetchone()
 
 # =========================
 # ADD HISTORY
@@ -91,7 +110,7 @@ def add_history(username, text, prediction, confidence):
         username,
         text,
         prediction,
-        confidence,
+        float(confidence),
         datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     ))
 
@@ -99,7 +118,7 @@ def add_history(username, text, prediction, confidence):
     conn.close()
 
 # =========================
-# GET HISTORY
+# GET USER HISTORY
 # =========================
 def get_history(username):
     conn = get_connection()
@@ -113,3 +132,40 @@ def get_history(username):
     """, (username,))
 
     return c.fetchall()
+
+# =========================
+# GET ALL HISTORY (ADMIN)
+# =========================
+def get_all_history():
+    conn = get_connection()
+    c = conn.cursor()
+
+    c.execute("""
+        SELECT * FROM history
+        ORDER BY id DESC
+    """)
+
+    return c.fetchall()
+
+# =========================
+# GET ALL USERS (ADMIN)
+# =========================
+def get_all_users():
+    conn = get_connection()
+    c = conn.cursor()
+
+    c.execute("SELECT id, username, role FROM users")
+
+    return c.fetchall()
+
+# =========================
+# DELETE USER (ADMIN CONTROL)
+# =========================
+def delete_user(username):
+    conn = get_connection()
+    c = conn.cursor()
+
+    c.execute("DELETE FROM users WHERE username=?", (username,))
+
+    conn.commit()
+    conn.close()
