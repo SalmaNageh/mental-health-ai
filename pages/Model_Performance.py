@@ -27,7 +27,7 @@ st.set_page_config(
 model = joblib.load("model.pkl")
 vectorizer = joblib.load("vectorizer.pkl")
 
-df = pd.read_csv("Combined Data.csv").dropna()
+df = pd.read_csv("sample_data.csv").dropna()
 
 # =========================
 # CLEAN TEXT
