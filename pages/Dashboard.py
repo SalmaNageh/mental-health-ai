@@ -86,8 +86,17 @@ def clean_text(text):
 # LOTTIE
 # =========================
 def load_lottie(url):
-    return requests.get(url).json()
 
+    try:
+        r = requests.get(url)
+
+        if r.status_code != 200:
+            return None
+
+        return r.json()
+
+    except:
+        return None
 # =========================
 # ANALYZE
 # =========================
@@ -126,7 +135,10 @@ if st.button("Analyze"):
         else:
             url = "https://assets9.lottiefiles.com/packages/lf20_t9gkkhz4.json"
 
-        st_lottie(load_lottie(url), height=180)
+        animation = load_lottie(url)
+
+if animation:
+    st_lottie(animation, height=180)
 
         # ================= RESULT =================
         st.markdown(f"""
