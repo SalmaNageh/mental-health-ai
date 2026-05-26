@@ -129,17 +129,26 @@ if st.button("Analyze"):
 
         # ================= LOTTIE =================
         if prediction == "Depression":
-            url = "https://assets2.lottiefiles.com/packages/lf20_depression.json"
-        elif prediction == "Anxiety":
-            url = "https://assets2.lottiefiles.com/packages/lf20_anxiety.json"
-        else:
-            url = "https://assets9.lottiefiles.com/packages/lf20_t9gkkhz4.json"
+            
 
-        animation = load_lottie(url)
+if prediction == "Depression":
+
+    url = "https://assets9.lottiefiles.com/packages/lf20_t9gkkhz4.json"
+
+elif prediction == "Anxiety":
+
+    url = "https://assets9.lottiefiles.com/packages/lf20_t9gkkhz4.json"
+
+else:
+
+    url = "https://assets9.lottiefiles.com/packages/lf20_t9gkkhz4.json"
+
+
+animation = load_lottie(url)
 
 if animation:
-    st_lottie(animation, height=180)
 
+    st_lottie(animation, height=180)
         # ================= RESULT =================
         st.markdown(f"""
         <div style="
