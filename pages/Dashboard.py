@@ -128,8 +128,9 @@ if st.button("Analyze"):
         st.session_state.history.append(prediction)
 
         # ================= LOTTIE =================
-        if prediction == "Depression":
-            
+# ================= LOTTIE =================
+
+
 
 if prediction == "Depression":
 
